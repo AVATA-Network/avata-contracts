@@ -5,12 +5,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import "./interfaces/IWAVAX.sol";
 import "./interfaces/IAdmin.sol";
 import "./interfaces/IDistribution.sol";
 
-contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
+contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     struct StakeRecord {
@@ -33,28 +34,28 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     IERC20Upgradeable public depositToken;
 
     /// @notice Accumulated ERC20s per share, times 1e36.
-    uint256 accTokenPerShare;
+    uint256 public accTokenPerShare;
 
     /// @notice Total amount of tokens deposited at the moment (staked)
-    uint256 totalDeposits;
+    uint256 public totalDeposits;
 
-    /// @notice Percent of deposit fee, must be >= depositFeePrecision / 100 and less than depositFeePrecision
-    uint256 depositFeePercent;
+    /// @notice Percent of deposit fee, must be <= DEPOSIT_FEE_PRECISION / 50
+    uint256 public depositFeePercent;
 
     /// @notice Amount of the deposit fee collected and ready to claim by the owner
-    uint256 depositFeeCollected;
+    uint256 public depositFeeCollected;
 
     /// @notice Token block time in seconds
-    uint256 tokenBlockTime;
+    uint256 public tokenBlockTime;
 
     /// @notice How many unique users there are in the pool
-    uint256 uniqueUsers;
+    uint256 public uniqueUsers;
 
     /// @notice Deposit fee precision for math calculations
     uint256 public DEPOSIT_FEE_PRECISION;
 
-    /// @notice Acc reward per share precision in ^36
-    uint256 public constant ACC_REWARD_PER_SHARE_PRECISION = 1e36;
+    /// @notice Acc reward per share precision in ^12
+    uint256 public constant ACC_REWARD_PER_SHARE_PRECISION = 1e12;
 
     /// @notice WAVAX address
     IWAVAX public wavax;
@@ -80,15 +81,18 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
         uint256 _depositFeePrecision,
         uint256 _depositFeePercent,
         uint256 _tokenBlockTime
-    ) public initializer {
+    ) external initializer {
         __Ownable_init();
         __Pausable_init();
+        __ReentrancyGuard_init();
 
         require(_depositFeePrecision >= 100, "I0");
-        DEPOSIT_FEE_PRECISION = _depositFeePrecision;
+        // Max deposit fee => 100 / 50 = 2%
+        require(_depositFeePercent <= _depositFeePrecision / 50, "I1");
         depositFeePercent = _depositFeePercent;
+        DEPOSIT_FEE_PRECISION = _depositFeePrecision;
 
-        require(address(_wavax) != address(0x0), "I1");
+        require(address(_wavax) != address(0x0), "I2");
         wavax = _wavax;
 
         depositToken = IERC20Upgradeable(_depositToken);
@@ -102,7 +106,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Deposit tokens
      */
-    function deposit(uint256 _amount) public whenNotPaused {
+    function deposit(uint256 _amount) external whenNotPaused {
         require(_amount > 0, "D0");
 
         UserInfo storage user = userInfo[msg.sender];
@@ -120,13 +124,14 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
         // Add deposit to total deposits
         totalDeposits = totalDeposits + depositAmount;
 
+        uint256 stakeId = user.stakesCount;
+
         // Increment if this is a new user of the pool
-        if (user.stakesCount == 0) {
+        if (stakeId == 0) {
             uniqueUsers = uniqueUsers + 1;
         }
 
         // Initialize a new stake record
-        uint256 stakeId = user.stakesCount;
         require(user.stakes[stakeId].id == 0, "D2");
 
         StakeRecord storage stake = user.stakes[stakeId];
@@ -139,24 +144,24 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
         // Update user's total amount
         user.totalAmount = user.totalAmount + depositAmount;
         // Compute reward debt
-        stake.rewardDebt = (stake.amount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION;
+        stake.rewardDebt = (depositAmount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION;
         // Set lockup time
         stake.tokensUnlockTime = block.timestamp + tokenBlockTime;
 
         // Push user's stake id
         user.stakeIds.push(stakeId);
         // Increase users's overall stakes count
-        user.stakesCount = user.stakesCount + 1;
+        user.stakesCount = stakeId + 1;
 
         // Safe transfer deposit tokens from user
         depositToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-        emit Deposit(msg.sender, stake.id, depositAmount);
+        emit Deposit(msg.sender, stakeId, depositAmount);
     }
 
     /**
      * @notice Withdraw deposit tokens and collect staking rewards in WAVAX from pool
      */
-    function withdraw(uint256 _stakeId) public whenNotPaused {
+    function withdraw(uint256 _stakeId) external whenNotPaused nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
 
         StakeRecord storage stake = user.stakes[_stakeId];
@@ -169,15 +174,15 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
         updatePool();
 
         // Compute user's pending amount
-        uint256 pendingAmount = (stake.amount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION - stake.rewardDebt;
+        uint256 pendingAmount = (amount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION - stake.rewardDebt;
 
         // Transfer pending amount to user
-        _safeTransferReward(msg.sender, pendingAmount);
-        user.totalRewarded = user.totalRewarded + pendingAmount;
+        uint256 transferedReward = _safeTransferReward(msg.sender, pendingAmount);
+        user.totalRewarded = user.totalRewarded + transferedReward;
         user.totalAmount = user.totalAmount - amount;
 
         stake.amount = 0;
-        stake.rewardDebt = (stake.amount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION;
+        stake.rewardDebt = 0;
 
         depositToken.safeTransfer(address(msg.sender), amount);
         totalDeposits = totalDeposits - amount;
@@ -199,22 +204,24 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Collect staking rewards in WAVAX
      */
-    function collect(uint256 _stakeId) public whenNotPaused {
+    function collect(uint256 _stakeId) external whenNotPaused nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
+        uint256 _accTokenPerShare = accTokenPerShare;
 
         StakeRecord storage stake = user.stakes[_stakeId];
-        require(stake.amount > 0, "C0");
+        uint256 amount = stake.amount;
+        require(amount > 0, "C0");
 
         // Update pool
         updatePool();
 
         // Compute user's pending amount
-        uint256 pendingAmount = (stake.amount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION - stake.rewardDebt;
+        uint256 pendingAmount = (amount * _accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION - stake.rewardDebt;
 
         // Transfer pending amount to user
-        _safeTransferReward(msg.sender, pendingAmount);
-        user.totalRewarded = user.totalRewarded + pendingAmount;
-        stake.rewardDebt = (stake.amount * accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION;
+        uint256 transferedReward = _safeTransferReward(msg.sender, pendingAmount);
+        user.totalRewarded = user.totalRewarded + transferedReward;
+        stake.rewardDebt = (amount * _accTokenPerShare) / ACC_REWARD_PER_SHARE_PRECISION;
 
         emit Collect(msg.sender, _stakeId, pendingAmount);
     }
@@ -223,7 +230,8 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
      * @notice Set deposit fee for particular pool
      */
     function setDepositFee(uint256 _depositFeePercent) external onlyOwner {
-        require(_depositFeePercent <= DEPOSIT_FEE_PRECISION);
+        // Max deposit fee => 100 / 50 = 2%
+        require(_depositFeePercent <= DEPOSIT_FEE_PRECISION / 50, "SDF0");
         depositFeePercent = _depositFeePercent;
 
         emit SetDepositFee(_depositFeePercent);
@@ -245,7 +253,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Get user's stakes count
      */
-    function userStakesCount(address _user) public view returns (uint256) {
+    function userStakesCount(address _user) external view returns (uint256) {
         UserInfo storage user = userInfo[_user];
         return user.stakeIds.length;
     }
@@ -253,7 +261,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Return user's stakes array
      */
-    function getUserStakes(address _user) public view returns (StakeRecord[] memory stakeArray) {
+    function getUserStakes(address _user) external view returns (StakeRecord[] memory stakeArray) {
         UserInfo storage user = userInfo[_user];
         stakeArray = new StakeRecord[](user.stakeIds.length);
         for (uint256 i = 0; i < user.stakeIds.length; i++) {
@@ -264,7 +272,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Return user's specific stake
      */
-    function getUserStake(address _user, uint256 _stakeId) public view returns (StakeRecord memory) {
+    function getUserStake(address _user, uint256 _stakeId) external view returns (StakeRecord memory) {
         UserInfo storage user = userInfo[_user];
         require(user.stakes[_stakeId].id == _stakeId, "Stake with this id does not exist");
         return user.stakes[_stakeId];
@@ -273,7 +281,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Return user's stake ids array
      */
-    function getUserStakeIds(address _user) public view returns (uint256[] memory) {
+    function getUserStakeIds(address _user) external view returns (uint256[] memory) {
         UserInfo storage user = userInfo[_user];
         return user.stakeIds;
     }
@@ -281,7 +289,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice View function to see deposited tokens for a particular user's stake.
      */
-    function deposited(address _user, uint256 _stakeId) public view returns (uint256) {
+    function deposited(address _user, uint256 _stakeId) external view returns (uint256) {
         UserInfo storage user = userInfo[_user];
         StakeRecord storage stake = user.stakes[_stakeId];
         require(stake.id == _stakeId, "Stake with this id does not exist");
@@ -289,7 +297,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     }
 
     // View function to see total deposited LP for a user.
-    function totalDeposited(address _user) public view returns (uint256) {
+    function totalDeposited(address _user) external view returns (uint256) {
         UserInfo storage user = userInfo[_user];
         return user.totalAmount;
     }
@@ -319,7 +327,7 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
     /**
      * @notice Number of pools
      */
-    function totalPending(address _user) public view returns (uint256) {
+    function totalPending(address _user) external view returns (uint256) {
         UserInfo storage user = userInfo[_user];
 
         uint256 pendingAmount = 0;
@@ -353,21 +361,20 @@ contract AVAXStaking is OwnableUpgradeable, PausableUpgradeable {
      * @param _to user address
      * @param _amount pending reward amount
      */
-    function _safeTransferReward(address _to, uint256 _amount) internal {
+    function _safeTransferReward(address _to, uint256 _amount) internal returns (uint256 amountToTransfer) {
         uint256 wavaxBalance = wavax.balanceOf(address(this));
 
         if (_amount > wavaxBalance) {
-            lastRewardBalance = lastRewardBalance - wavaxBalance;
-            paidOut += wavaxBalance;
-
-            wavax.withdraw(wavaxBalance);
-            payable(_to).transfer(wavaxBalance);
+            amountToTransfer = wavaxBalance;
         } else {
-            lastRewardBalance = lastRewardBalance - wavaxBalance;
-            paidOut += _amount;
-
-            wavax.withdraw(_amount);
-            payable(_to).transfer(_amount);
+            amountToTransfer = _amount;
         }
+
+        lastRewardBalance = lastRewardBalance - amountToTransfer;
+        paidOut += amountToTransfer;
+
+        wavax.withdraw(amountToTransfer);
+        (bool success, ) = _to.call{value: amountToTransfer}("");
+        require(success, "_SFR0");
     }
 }
