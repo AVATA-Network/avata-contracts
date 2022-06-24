@@ -75,7 +75,7 @@ contract PriceOracleProxyUSD is PriceOracle, ExponentialNoError {
      * @param jToken The jToken to get the underlying price of
      * @return The underlying asset price mantissa (scaled by 1e18)
      */
-    function getUnderlyingPrice(AToken jToken) override public view returns (uint256) {
+    function getUnderlyingPrice(AToken jToken) public view override returns (uint256) {
         address jTokenAddress = address(jToken);
 
         AggregatorV3Interface aggregator = aggregators[jTokenAddress];

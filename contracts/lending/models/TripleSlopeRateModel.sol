@@ -11,14 +11,7 @@ import "../library/SafeMath.sol";
 contract TripleSlopeRateModel is InterestRateModel {
     using SafeMath for uint256;
 
-    event NewInterestParams(
-        uint256 baseRatePerBlock,
-        uint256 multiplierPerBlock,
-        uint256 jumpMultiplierPerBlock,
-        uint256 kink1,
-        uint256 kink2,
-        uint256 roof
-    );
+    event NewInterestParams(uint256 baseRatePerBlock, uint256 multiplierPerBlock, uint256 jumpMultiplierPerBlock, uint256 kink1, uint256 kink2, uint256 roof);
 
     /**
      * @notice The address of the owner, i.e. the Timelock contract, which can update parameters directly
@@ -147,7 +140,7 @@ contract TripleSlopeRateModel is InterestRateModel {
         uint256 cash,
         uint256 borrows,
         uint256 reserves
-    ) override public view returns (uint256) {
+    ) public view override returns (uint256) {
         uint256 util = utilizationRate(cash, borrows, reserves);
 
         if (util <= kink1) {
@@ -174,7 +167,7 @@ contract TripleSlopeRateModel is InterestRateModel {
         uint256 borrows,
         uint256 reserves,
         uint256 reserveFactorMantissa
-    ) override public view returns (uint256) {
+    ) public view override returns (uint256) {
         uint256 oneMinusReserveFactor = uint256(1e18).sub(reserveFactorMantissa);
         uint256 borrowRate = getBorrowRate(cash, borrows, reserves);
         uint256 rateToPool = borrowRate.mul(oneMinusReserveFactor).div(1e18);

@@ -5,8 +5,8 @@ import "../oracles/PriceOracle.sol";
 import "../AErc20.sol";
 
 contract SimplePriceOracle is PriceOracle {
-    mapping(address => uint) prices;
-    event PricePosted(address asset, uint previousPriceMantissa, uint requestedPriceMantissa, uint newPriceMantissa);
+    mapping(address => uint256) prices;
+    event PricePosted(address asset, uint256 previousPriceMantissa, uint256 requestedPriceMantissa, uint256 newPriceMantissa);
 
     function _getUnderlyingAddress(AToken aToken) private view returns (address) {
         address asset;
@@ -18,23 +18,23 @@ contract SimplePriceOracle is PriceOracle {
         return asset;
     }
 
-    function getUnderlyingPrice(AToken aToken) public override view returns (uint) {
+    function getUnderlyingPrice(AToken aToken) public view override returns (uint256) {
         return prices[_getUnderlyingAddress(aToken)];
     }
 
-    function setUnderlyingPrice(AToken aToken, uint underlyingPriceMantissa) public {
+    function setUnderlyingPrice(AToken aToken, uint256 underlyingPriceMantissa) public {
         address asset = _getUnderlyingAddress(aToken);
         emit PricePosted(asset, prices[asset], underlyingPriceMantissa, underlyingPriceMantissa);
         prices[asset] = underlyingPriceMantissa;
     }
 
-    function setDirectPrice(address asset, uint price) public {
+    function setDirectPrice(address asset, uint256 price) public {
         emit PricePosted(asset, prices[asset], price, price);
         prices[asset] = price;
     }
 
     // v1 price oracle interface for use as backing of proxy
-    function assetPrices(address asset) external view returns (uint) {
+    function assetPrices(address asset) external view returns (uint256) {
         return prices[asset];
     }
 

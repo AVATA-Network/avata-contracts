@@ -1,4 +1,4 @@
-import { HardhatRuntimeEnvironment } from 'hardhat/types';
+import { HardhatRuntimeEnvironment } from "hardhat/types"
 
 module.exports = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre
@@ -24,4 +24,3 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 module.exports.tags = ["GovernanceInterestRateModel"]
-

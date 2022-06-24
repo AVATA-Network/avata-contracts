@@ -1,4 +1,4 @@
-import { HardhatRuntimeEnvironment } from 'hardhat/types';
+import { HardhatRuntimeEnvironment } from "hardhat/types"
 
 module.exports = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre
@@ -6,13 +6,13 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
 
     const { deployer } = await getNamedAccounts()
 
-    const unitroller = await deploy('Unitroller', {
+    const unitroller = await deploy("Unitroller", {
         from: deployer,
         log: true,
-    });
+    })
 
     if (unitroller.newlyDeployed) {
-        const tx = await execute('Unitroller', { from: deployer, log: true }, '_setPendingAdmin', deployer);
+        const tx = await execute("Unitroller", { from: deployer, log: true }, "_setPendingAdmin", deployer)
         console.log(`set pending admin (tx: ${tx.transactionHash})`)
     }
 }
