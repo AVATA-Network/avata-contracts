@@ -92,7 +92,7 @@ module.exports.dependencies = [
     "GovernanceInterestRateModel",
 ]
 
-const _readyTokensForDeploy = ["USDT"]
+const _readyTokensForDeploy = ["USDC", "USDC.e", "USDT", "USDT.e", "WETH", "WBTC.e"]
 const _config = new Map<string, ATokenConfig[]>()
 
 enum InterestRateModelEnum {
@@ -111,6 +111,56 @@ _config.set("43113", [
         priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
         collateralFactor: "0.2",
         reserveFactor: "0.15",
+    },
+    {
+        name: "USDT.e",
+        tokenAddress: "0x480Ec1a46612EC8ECCA2d8B88d6078f971216B6B",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
+        collateralFactor: "0.2",
+        reserveFactor: "0.15",
+    },
+    {
+        name: "USDC",
+        tokenAddress: "0xC5e8EB3856eb093AE7EE12DD04d02A2de0FF5d67",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
+        collateralFactor: "0.2",
+        reserveFactor: "0.15",
+    },
+    {
+        name: "USDC.e",
+        tokenAddress: "0x26789a2A4fD03145E1C511CBeC502A7D13cd0C6C",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
+        collateralFactor: "0.2",
+        reserveFactor: "0.15",
+    },
+    {
+        name: "WETH",
+        tokenAddress: "0x4F6D55eeF0B466F9146F6f295728b064760078Ab",
+        interestRateModel: InterestRateModelEnum.MAJOR,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 26).toString(),
+        priceFeedAddress: "0x86d67c3D38D2bCeE722E601025C25a575021c6EA",
+        collateralFactor: "0.75",
+        reserveFactor: "0.2",
+    },
+    {
+        name: "WBTC.e",
+        tokenAddress: "0x4CdaB0fF4E4185bE0f6E8c3a429841bFBAfea92B",
+        interestRateModel: InterestRateModelEnum.MAJOR,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 16).toString(),
+        priceFeedAddress: "0x31CF013A08c6Ac228C94551d535d5BAfE19c602a",
+        collateralFactor: "0.75",
+        reserveFactor: "0.2",
     },
 ])
 

@@ -9,6 +9,8 @@ import "./AToken.sol";
  * @author Compound
  */
 contract AAVAX is AToken {
+    address public underlying;
+
     /**
      * @notice Construct a new AAVAX money market
      * @param comptroller_ The address of the Avatroller
@@ -32,6 +34,9 @@ contract AAVAX is AToken {
         admin = payable(msg.sender);
 
         initialize(comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
+
+        // for PriceOracleProxyUSD
+        underlying = address(0x0);
 
         // Set the proper admin now that initialization is done
         admin = admin_;

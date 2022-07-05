@@ -51,15 +51,6 @@ contract PriceOracleProxyUSD is PriceOracle, ExponentialNoError {
     /// @notice Guardian address
     address public guardian;
 
-    /// @notice joe address
-    address public joeAddress = 0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd;
-
-    /// @notice xJoe address
-    address public xJoeAddress = 0x57319d41F71E81F3c65F2a47CA4e001EbAFd4F33;
-
-    /// @notice jXJoe address
-    address public jXJoeAddress = 0xC146783a59807154F92084f9243eb139D58Da696;
-
     /// @notice Chainlink Aggregators
     mapping(address => AggregatorV3Interface) public aggregators;
 
@@ -72,28 +63,30 @@ contract PriceOracleProxyUSD is PriceOracle, ExponentialNoError {
 
     /**
      * @notice Get the underlying price of a listed jToken asset
-     * @param jToken The jToken to get the underlying price of
+     * @param aToken The jToken to get the underlying price of
      * @return The underlying asset price mantissa (scaled by 1e18)
      */
-    function getUnderlyingPrice(AToken jToken) public view override returns (uint256) {
-        address jTokenAddress = address(jToken);
+    function getUnderlyingPrice(AToken aToken) public view override returns (uint256) {
+        address aTokenAddress = address(aToken);
+        AggregatorV3Interface aggregator = aggregators[aTokenAddress];
+        require(address(aggregator) != address(0), "No aggregator found");
 
-        AggregatorV3Interface aggregator = aggregators[jTokenAddress];
-        if (address(aggregator) != address(0)) {
-            uint256 chainLinkPrice = getPriceFromChainlink(aggregator);
-            uint256 underlyingDecimals = EIP20Interface(AErc20(jTokenAddress).underlying()).decimals();
+        uint256 chainLinkPrice = getPriceFromChainlink(aggregator);
+        EIP20Interface underlyingAddress = EIP20Interface(AErc20(aTokenAddress).underlying());
+        uint256 underlyingDecimals;
 
-            if (underlyingDecimals <= 18) {
-                return mul_(chainLinkPrice, 10**(18 - underlyingDecimals));
-            }
-            return div_(chainLinkPrice, 10**(underlyingDecimals - 18));
+        // if AVAX
+        if (address(underlyingAddress) == address(0x0)) {
+            underlyingDecimals = 18;
+        } else {
+            underlyingDecimals = underlyingAddress.decimals();
         }
 
-        address asset = address(AErc20(jTokenAddress).underlying());
+        if (underlyingDecimals <= 18) {
+            return mul_(chainLinkPrice, 10**(18 - underlyingDecimals));
+        }
 
-        uint256 price = prices[asset];
-        require(price > 0, "invalid price");
-        return price;
+        return div_(chainLinkPrice, 10**(underlyingDecimals - 18));
     }
 
     /*** Internal fucntions ***/
@@ -109,18 +102,6 @@ contract PriceOracleProxyUSD is PriceOracle, ExponentialNoError {
 
         // Extend the decimals to 1e18.
         return mul_(uint256(price), 10**(18 - uint256(aggregator.decimals())));
-    }
-
-    /**
-     * @notice Get joe:xJoe ratio
-     * @return The ratio
-     */
-    function getXJoeRatio() internal view returns (uint256) {
-        uint256 joeAmount = EIP20Interface(joeAddress).balanceOf(xJoeAddress);
-        uint256 xJoeAmount = EIP20Interface(xJoeAddress).totalSupply();
-
-        // return the joe:xJoe ratio
-        return div_(joeAmount, Exp({mantissa: xJoeAmount}));
     }
 
     /*** Admin or guardian functions ***/
@@ -151,39 +132,18 @@ contract PriceOracleProxyUSD is PriceOracle, ExponentialNoError {
 
     /**
      * @notice Set ChainLink aggregators for multiple jTokens
-     * @param jTokenAddresses The list of jTokens
+     * @param aTokenAddresses The list of jTokens
      * @param sources The list of ChainLink aggregator sources
      */
-    function _setAggregators(address[] calldata jTokenAddresses, address[] calldata sources) external {
+    function _setAggregators(address[] calldata aTokenAddresses, address[] calldata sources) external {
         require(msg.sender == admin || msg.sender == guardian, "only the admin or guardian may set the aggregators");
-        require(jTokenAddresses.length == sources.length, "mismatched data");
-        for (uint256 i = 0; i < jTokenAddresses.length; i++) {
+        require(aTokenAddresses.length == sources.length, "mismatched data");
+        for (uint256 i = 0; i < aTokenAddresses.length; i++) {
             if (sources[i] != address(0)) {
                 require(msg.sender == admin, "guardian may only clear the aggregator");
             }
-            aggregators[jTokenAddresses[i]] = AggregatorV3Interface(sources[i]);
-            emit AggregatorUpdated(jTokenAddresses[i], sources[i]);
+            aggregators[aTokenAddresses[i]] = AggregatorV3Interface(sources[i]);
+            emit AggregatorUpdated(aTokenAddresses[i], sources[i]);
         }
-    }
-
-    /**
-     * @notice Set the price of underlying asset
-     * @param jToken The jToken to get underlying asset from
-     * @param underlyingPriceMantissa The new price for the underling asset
-     */
-    function _setUnderlyingPrice(AToken jToken, uint256 underlyingPriceMantissa) external {
-        require(msg.sender == admin, "only the admin may set the underlying price");
-        address asset = address(AErc20(address(jToken)).underlying());
-        prices[asset] = underlyingPriceMantissa;
-    }
-
-    /**
-     * @notice Set the price of the underlying asset directly
-     * @param asset The address of the underlying asset
-     * @param price The new price of the asset
-     */
-    function setDirectPrice(address asset, uint256 price) external {
-        require(msg.sender == admin, "only the admin may set the direct price");
-        prices[asset] = price;
     }
 }
