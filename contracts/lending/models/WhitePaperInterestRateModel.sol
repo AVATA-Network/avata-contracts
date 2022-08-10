@@ -5,7 +5,6 @@ import "./InterestRateModel.sol";
 
 /**
  * @title Compound's WhitePaperInterestRateModel Contract
- * @author Compound
  * @notice The parameterized model described in section 2.4 of the original Compound Protocol whitepaper
  */
 contract WhitePaperInterestRateModel is InterestRateModel {

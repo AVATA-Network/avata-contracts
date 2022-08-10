@@ -5,6 +5,8 @@ function capitalizeFirstLetter(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 module.exports = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts, getChainId } = hre
     const { deploy, execute } = deployments
@@ -43,6 +45,8 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
             collateralFactor,
             reserveFactor,
             initialExchangeRateMantissa,
+            avatBorrowSpeed,
+            avatSupplySpeed,
         } = aTokenConfig
 
         if (name === "AVAX") {
@@ -73,12 +77,23 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
         })
 
         await execute("Avatroller", { from: deployer, gasLimit: 2000000, log: true }, "_supportMarket", aErc20Delegator.address)
-
+        await sleep(3000)
         await execute("PriceOracleProxyUSD", { from: deployer, log: true }, "_setAggregators", [aErc20Delegator.address], [priceFeedAddress])
-
+        await sleep(3000)
         await execute("Avatroller", { from: deployer, log: true }, "_setCollateralFactor", aErc20Delegator.address, parseEther(collateralFactor))
-
+        await sleep(3000)
         await execute(contractName, { from: deployer, log: true }, "_setReserveFactor", parseEther(reserveFactor))
+
+        if (+avatBorrowSpeed > 0 || +avatSupplySpeed > 0) {
+            await execute(
+                "Avatroller",
+                { from: deployer, log: true },
+                "_setAvatSpeed",
+                aErc20Delegator.address,
+                parseUnits(avatSupplySpeed, "6"),
+                parseUnits(avatBorrowSpeed, "6")
+            )
+        }
     }
 }
 
@@ -92,7 +107,7 @@ module.exports.dependencies = [
     "GovernanceInterestRateModel",
 ]
 
-const _readyTokensForDeploy = ["USDC", "USDC.e", "USDT", "USDT.e", "WETH", "WBTC.e"]
+const _readyTokensForDeploy = ["USDC", "USDC.e", "USDT", "USDT.e", "WETH.e", "WBTC.e"]
 const _config = new Map<string, ATokenConfig[]>()
 
 enum InterestRateModelEnum {
@@ -101,6 +116,7 @@ enum InterestRateModelEnum {
     GOVERNANCE = "GovernanceInterestRateModel",
 }
 
+// fuji
 _config.set("43113", [
     {
         name: "USDT",
@@ -109,8 +125,10 @@ _config.set("43113", [
         decimals: 8,
         initialExchangeRateMantissa: parseUnits("2", 14).toString(),
         priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
-        collateralFactor: "0.2",
+        collateralFactor: "0.80",
         reserveFactor: "0.15",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
     },
     {
         name: "USDT.e",
@@ -119,8 +137,10 @@ _config.set("43113", [
         decimals: 8,
         initialExchangeRateMantissa: parseUnits("2", 14).toString(),
         priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
-        collateralFactor: "0.2",
+        collateralFactor: "0.80",
         reserveFactor: "0.15",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
     },
     {
         name: "USDC",
@@ -129,8 +149,10 @@ _config.set("43113", [
         decimals: 8,
         initialExchangeRateMantissa: parseUnits("2", 14).toString(),
         priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
-        collateralFactor: "0.2",
-        reserveFactor: "0.15",
+        collateralFactor: "0.80",
+        reserveFactor: "0.20",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
     },
     {
         name: "USDC.e",
@@ -139,8 +161,10 @@ _config.set("43113", [
         decimals: 8,
         initialExchangeRateMantissa: parseUnits("2", 14).toString(),
         priceFeedAddress: "0x7898AcCC83587C3C55116c5230C17a6Cd9C71bad",
-        collateralFactor: "0.2",
-        reserveFactor: "0.15",
+        collateralFactor: "0.80",
+        reserveFactor: "0.20",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
     },
     {
         name: "WETH",
@@ -151,6 +175,8 @@ _config.set("43113", [
         priceFeedAddress: "0x86d67c3D38D2bCeE722E601025C25a575021c6EA",
         collateralFactor: "0.75",
         reserveFactor: "0.2",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
     },
     {
         name: "WBTC.e",
@@ -161,6 +187,84 @@ _config.set("43113", [
         priceFeedAddress: "0x31CF013A08c6Ac228C94551d535d5BAfE19c602a",
         collateralFactor: "0.75",
         reserveFactor: "0.2",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
+    },
+])
+
+// avalanche mainnet
+_config.set("43114", [
+    {
+        name: "USDT",
+        tokenAddress: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0xEBE676ee90Fe1112671f19b6B7459bC678B67e8a",
+        collateralFactor: "0.80",
+        reserveFactor: "0.15",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
+    },
+    {
+        name: "USDT.e",
+        tokenAddress: "0xc7198437980c041c805A1EDcbA50c1Ce5db95118",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0xEBE676ee90Fe1112671f19b6B7459bC678B67e8a",
+        collateralFactor: "0.80",
+        reserveFactor: "0.15",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
+    },
+    {
+        name: "USDC",
+        tokenAddress: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0xF096872672F44d6EBA71458D74fe67F9a77a23B9",
+        collateralFactor: "0.80",
+        reserveFactor: "0.20",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
+    },
+    {
+        name: "USDC.e",
+        tokenAddress: "0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664",
+        interestRateModel: InterestRateModelEnum.STABLE,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 14).toString(),
+        priceFeedAddress: "0xF096872672F44d6EBA71458D74fe67F9a77a23B9",
+        collateralFactor: "0.80",
+        reserveFactor: "0.20",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
+    },
+    {
+        name: "WETH.e",
+        tokenAddress: "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB",
+        interestRateModel: InterestRateModelEnum.MAJOR,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 26).toString(),
+        priceFeedAddress: "0x976B3D034E162d8bD72D6b9C989d545b839003b0",
+        collateralFactor: "0.75",
+        reserveFactor: "0.2",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
+    },
+    {
+        name: "WBTC.e",
+        tokenAddress: "0x50b7545627a5162F82A992c33b87aDc75187B218",
+        interestRateModel: InterestRateModelEnum.MAJOR,
+        decimals: 8,
+        initialExchangeRateMantissa: parseUnits("2", 16).toString(),
+        priceFeedAddress: "0x2779D32d5166BAaa2B2b658333bA7e6Ec0C65743",
+        collateralFactor: "0.75",
+        reserveFactor: "0.2",
+        avatBorrowSpeed: "0.1",
+        avatSupplySpeed: "0.1",
     },
 ])
 
@@ -173,4 +277,6 @@ interface ATokenConfig {
     priceFeedAddress: string
     collateralFactor: string
     reserveFactor: string
+    avatBorrowSpeed: string
+    avatSupplySpeed: string
 }

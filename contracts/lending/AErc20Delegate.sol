@@ -6,7 +6,6 @@ import "./AErc20.sol";
 /**
  * @title Compound's AErc20Delegate Contract
  * @notice CTokens which wrap an EIP-20 underlying and are delegated to
- * @author Compound
  */
 contract AErc20Delegate is AErc20, ADelegateInterface {
     /**

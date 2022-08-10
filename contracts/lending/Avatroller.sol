@@ -5,15 +5,14 @@ import "./AToken.sol";
 import "./library/ErrorReporter.sol";
 import "./oracles/PriceOracle.sol";
 import "./interfaces/AvatrollerInterface.sol";
+import "./interfaces/EIP20Interface.sol";
 import "./AvatrollerStorage.sol";
 import "./Unitroller.sol";
-import "./Comp.sol";
 
 /**
- * @title Compound's Avatroller Contract
- * @author Compound
+ * @title Avatroller Contract
  */
-contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerErrorReporter, ExponentialNoError {
+contract Avatroller is AvatrollerStorage, AvatrollerInterface, AvatrollerErrorReporter, ExponentialNoError {
     /// @notice Emitted when an admin supports a market
     event MarketListed(AToken aToken);
 
@@ -45,19 +44,19 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
     event ActionPaused(AToken aToken, string action, bool pauseState);
 
     /// @notice Emitted when a new borrow-side COMP speed is calculated for a market
-    event CompBorrowSpeedUpdated(AToken indexed aToken, uint256 newSpeed);
+    event AvatBorrowSpeedUpdated(AToken indexed aToken, uint256 newSpeed);
 
     /// @notice Emitted when a new supply-side COMP speed is calculated for a market
-    event CompSupplySpeedUpdated(AToken indexed aToken, uint256 newSpeed);
+    event AvatSupplySpeedUpdated(AToken indexed aToken, uint256 newSpeed);
 
     /// @notice Emitted when a new COMP speed is set for a contributor
-    event ContributorCompSpeedUpdated(address indexed contributor, uint256 newSpeed);
+    event ContributorAvatSpeedUpdated(address indexed contributor, uint256 newSpeed);
 
     /// @notice Emitted when COMP is distributed to a supplier
-    event DistributedSupplierComp(AToken indexed aToken, address indexed supplier, uint256 compDelta, uint256 compSupplyIndex);
+    event DistributedSupplierAvat(AToken indexed aToken, address indexed supplier, uint256 avatDelta, uint256 avatSupplyIndex);
 
     /// @notice Emitted when COMP is distributed to a borrower
-    event DistributedBorrowerComp(AToken indexed aToken, address indexed borrower, uint256 compDelta, uint256 compBorrowIndex);
+    event DistributedBorrowerAvat(AToken indexed aToken, address indexed borrower, uint256 avatDelta, uint256 avatBorrowIndex);
 
     /// @notice Emitted when borrow cap for a aToken is changed
     event NewBorrowCap(AToken indexed aToken, uint256 newBorrowCap);
@@ -66,16 +65,16 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
     event NewBorrowCapGuardian(address oldBorrowCapGuardian, address newBorrowCapGuardian);
 
     /// @notice Emitted when COMP is granted by admin
-    event CompGranted(address recipient, uint256 amount);
+    event AvatGranted(address recipient, uint256 amount);
 
     /// @notice Emitted when COMP accrued for a user has been manually adjusted.
-    event CompAccruedAdjusted(address indexed user, uint256 oldCompAccrued, uint256 newCompAccrued);
+    event AvatAccruedAdjusted(address indexed user, uint256 oldAvatAccrued, uint256 newAvatAccrued);
 
     /// @notice Emitted when COMP receivable for a user has been updated.
-    event CompReceivableUpdated(address indexed user, uint256 oldCompReceivable, uint256 newCompReceivable);
+    event AvatReceivableUpdated(address indexed user, uint256 oldAvatReceivable, uint256 newAvatReceivable);
 
     /// @notice The initial COMP index for a market
-    uint224 public constant compInitialIndex = 1e36;
+    uint224 public constant avatInitialIndex = 1e36;
 
     // closeFactorMantissa must be strictly greater than this value
     uint256 internal constant closeFactorMinMantissa = 0.05e18; // 0.05
@@ -248,8 +247,8 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         }
 
         // Keep the flywheel moving
-        updateCompSupplyIndex(aToken);
-        distributeSupplierComp(aToken, minter);
+        updateAvatSupplyIndex(aToken);
+        distributeSupplierAvat(aToken, minter);
 
         return uint256(Error.NO_ERROR);
     }
@@ -297,8 +296,8 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         }
 
         // Keep the flywheel moving
-        updateCompSupplyIndex(aToken);
-        distributeSupplierComp(aToken, redeemer);
+        updateAvatSupplyIndex(aToken);
+        distributeSupplierAvat(aToken, redeemer);
 
         return uint256(Error.NO_ERROR);
     }
@@ -407,8 +406,8 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
 
         // Keep the flywheel moving
         Exp memory borrowIndex = Exp({mantissa: AToken(aToken).borrowIndex()});
-        updateCompBorrowIndex(aToken, borrowIndex);
-        distributeBorrowerComp(aToken, borrower, borrowIndex);
+        updateAvatBorrowIndex(aToken, borrowIndex);
+        distributeBorrowerAvat(aToken, borrower, borrowIndex);
 
         return uint256(Error.NO_ERROR);
     }
@@ -460,8 +459,8 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
 
         // Keep the flywheel moving
         Exp memory borrowIndex = Exp({mantissa: AToken(aToken).borrowIndex()});
-        updateCompBorrowIndex(aToken, borrowIndex);
-        distributeBorrowerComp(aToken, borrower, borrowIndex);
+        updateAvatBorrowIndex(aToken, borrowIndex);
+        distributeBorrowerAvat(aToken, borrower, borrowIndex);
 
         return uint256(Error.NO_ERROR);
     }
@@ -595,14 +594,14 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
             return uint256(Error.MARKET_NOT_LISTED);
         }
 
-        if (AToken(cTokenCollateral).comptroller() != AToken(cTokenBorrowed).comptroller()) {
+        if (AToken(cTokenCollateral).avatroller() != AToken(cTokenBorrowed).avatroller()) {
             return uint256(Error.COMPTROLLER_MISMATCH);
         }
 
         // Keep the flywheel moving
-        updateCompSupplyIndex(cTokenCollateral);
-        distributeSupplierComp(cTokenCollateral, borrower);
-        distributeSupplierComp(cTokenCollateral, liquidator);
+        updateAvatSupplyIndex(cTokenCollateral);
+        distributeSupplierAvat(cTokenCollateral, borrower);
+        distributeSupplierAvat(cTokenCollateral, liquidator);
 
         return uint256(Error.NO_ERROR);
     }
@@ -660,9 +659,9 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         }
 
         // Keep the flywheel moving
-        updateCompSupplyIndex(aToken);
-        distributeSupplierComp(aToken, src);
-        distributeSupplierComp(aToken, dst);
+        updateAvatSupplyIndex(aToken);
+        distributeSupplierAvat(aToken, src);
+        distributeSupplierAvat(aToken, dst);
 
         return uint256(Error.NO_ERROR);
     }
@@ -901,7 +900,7 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
     /*** Admin Functions ***/
 
     /**
-     * @notice Sets a new price oracle for the comptroller
+     * @notice Sets a new price oracle for the avatroller
      * @dev Admin function to set a new price oracle
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
@@ -911,10 +910,10 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
             return fail(Error.UNAUTHORIZED, FailureInfo.SET_PRICE_ORACLE_OWNER_CHECK);
         }
 
-        // Track the old oracle for the comptroller
+        // Track the old oracle for the avatroller
         PriceOracle oldOracle = oracle;
 
-        // Set comptroller's oracle to newOracle
+        // Set avatroller's oracle to newOracle
         oracle = newOracle;
 
         // Emit NewPriceOracle(oldOracle, newOracle)
@@ -936,6 +935,21 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         uint256 oldCloseFactorMantissa = closeFactorMantissa;
         closeFactorMantissa = newCloseFactorMantissa;
         emit NewCloseFactor(oldCloseFactorMantissa, closeFactorMantissa);
+
+        return uint256(Error.NO_ERROR);
+    }
+
+    /**
+     * @notice Sets the AVAT token address
+     * @dev Admin function to set token address
+     * @param avatAddress_ AVAT Token address
+     * @return uint 0=success, otherwise a failure
+     */
+    function _setAvatAddress(address avatAddress_) external returns (uint256) {
+        // Check caller is admin
+        require(msg.sender == admin, "only admin can set close factor");
+        require(avatAddress == address(0x0), "avatAddress has already set");
+        avatAddress = avatAddress_;
 
         return uint256(Error.NO_ERROR);
     }
@@ -1023,10 +1037,9 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
 
         aToken.isCToken(); // Sanity check to make sure its really a AToken
 
-        // Note that isComped is not in active use anymore
+        // Note that isAvated is not in active use anymore
         Market storage newMarket = markets[address(aToken)];
         newMarket.isListed = true;
-        newMarket.isComped = false;
         newMarket.collateralFactorMantissa = 0;
 
         _addMarketInternal(address(aToken));
@@ -1047,20 +1060,20 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
     function _initializeMarket(address aToken) internal {
         uint32 blockNumber = safe32(getBlockNumber(), "block number exceeds 32 bits");
 
-        CompMarketState storage supplyState = compSupplyState[aToken];
-        CompMarketState storage borrowState = compBorrowState[aToken];
+        AvatMarketState storage supplyState = avatSupplyState[aToken];
+        AvatMarketState storage borrowState = avatBorrowState[aToken];
 
         /*
          * Update market state indices
          */
         if (supplyState.index == 0) {
             // Initialize supply state index with default value
-            supplyState.index = compInitialIndex;
+            supplyState.index = avatInitialIndex;
         }
 
         if (borrowState.index == 0) {
             // Initialize borrow state index with default value
-            borrowState.index = compInitialIndex;
+            borrowState.index = avatInitialIndex;
         }
 
         /*
@@ -1171,62 +1184,14 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         require(unitroller._acceptImplementation() == 0, "change not authorized");
     }
 
-    /// @notice Delete this function after proposal 65 is executed
-    function fixBadAccruals(address[] calldata affectedUsers, uint256[] calldata amounts) external {
-        require(msg.sender == admin, "Only admin can call this function"); // Only the timelock can call this function
-        require(!proposal65FixExecuted, "Already executed this one-off function"); // Require that this function is only called once
-        require(affectedUsers.length == amounts.length, "Invalid input");
-
-        // Loop variables
-        address user;
-        uint256 currentAccrual;
-        uint256 amountToSubtract;
-        uint256 newAccrual;
-
-        // Iterate through all affected users
-        for (uint256 i = 0; i < affectedUsers.length; ++i) {
-            user = affectedUsers[i];
-            currentAccrual = compAccrued[user];
-
-            amountToSubtract = amounts[i];
-
-            // The case where the user has claimed and received an incorrect amount of COMP.
-            // The user has less currently accrued than the amount they incorrectly received.
-            if (amountToSubtract > currentAccrual) {
-                // Amount of COMP the user owes the protocol
-                uint256 accountReceivable = amountToSubtract - currentAccrual; // Underflow safe since amountToSubtract > currentAccrual
-
-                uint256 oldReceivable = compReceivable[user];
-                uint256 newReceivable = add_(oldReceivable, accountReceivable);
-
-                // Accounting: record the COMP debt for the user
-                compReceivable[user] = newReceivable;
-
-                emit CompReceivableUpdated(user, oldReceivable, newReceivable);
-
-                amountToSubtract = currentAccrual;
-            }
-
-            if (amountToSubtract > 0) {
-                // Subtract the bad accrual amount from what they have accrued.
-                // Users will keep whatever they have correctly accrued.
-                compAccrued[user] = newAccrual = sub_(currentAccrual, amountToSubtract);
-
-                emit CompAccruedAdjusted(user, currentAccrual, newAccrual);
-            }
-        }
-
-        proposal65FixExecuted = true; // Makes it so that this function cannot be called again
-    }
-
     /**
      * @notice Checks caller is admin, or this contract is becoming the new implementation
      */
     function adminOrInitializing() internal view returns (bool) {
-        return msg.sender == admin || msg.sender == comptrollerImplementation;
+        return msg.sender == admin || msg.sender == avatrollerImplementation;
     }
 
-    /*** Comp Distribution ***/
+    /*** Avat Distribution ***/
 
     /**
      * @notice Set COMP speed for a single market
@@ -1234,35 +1199,35 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param supplySpeed New supply-side COMP speed for market
      * @param borrowSpeed New borrow-side COMP speed for market
      */
-    function setCompSpeedInternal(
+    function setAvatSpeedInternal(
         AToken aToken,
         uint256 supplySpeed,
         uint256 borrowSpeed
     ) internal {
         Market storage market = markets[address(aToken)];
-        require(market.isListed, "comp market is not listed");
+        require(market.isListed, "avat market is not listed");
 
-        if (compSupplySpeeds[address(aToken)] != supplySpeed) {
+        if (avatSupplySpeeds[address(aToken)] != supplySpeed) {
             // Supply speed updated so let's update supply state to ensure that
             //  1. COMP accrued properly for the old speed, and
             //  2. COMP accrued at the new speed starts after this block.
-            updateCompSupplyIndex(address(aToken));
+            updateAvatSupplyIndex(address(aToken));
 
             // Update speed and emit event
-            compSupplySpeeds[address(aToken)] = supplySpeed;
-            emit CompSupplySpeedUpdated(aToken, supplySpeed);
+            avatSupplySpeeds[address(aToken)] = supplySpeed;
+            emit AvatSupplySpeedUpdated(aToken, supplySpeed);
         }
 
-        if (compBorrowSpeeds[address(aToken)] != borrowSpeed) {
+        if (avatBorrowSpeeds[address(aToken)] != borrowSpeed) {
             // Borrow speed updated so let's update borrow state to ensure that
             //  1. COMP accrued properly for the old speed, and
             //  2. COMP accrued at the new speed starts after this block.
             Exp memory borrowIndex = Exp({mantissa: aToken.borrowIndex()});
-            updateCompBorrowIndex(address(aToken), borrowIndex);
+            updateAvatBorrowIndex(address(aToken), borrowIndex);
 
             // Update speed and emit event
-            compBorrowSpeeds[address(aToken)] = borrowSpeed;
-            emit CompBorrowSpeedUpdated(aToken, borrowSpeed);
+            avatBorrowSpeeds[address(aToken)] = borrowSpeed;
+            emit AvatBorrowSpeedUpdated(aToken, borrowSpeed);
         }
     }
 
@@ -1271,15 +1236,15 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param aToken The market whose supply index to update
      * @dev Index is a cumulative sum of the COMP per aToken accrued.
      */
-    function updateCompSupplyIndex(address aToken) internal {
-        CompMarketState storage supplyState = compSupplyState[aToken];
-        uint256 supplySpeed = compSupplySpeeds[aToken];
+    function updateAvatSupplyIndex(address aToken) internal {
+        AvatMarketState storage supplyState = avatSupplyState[aToken];
+        uint256 supplySpeed = avatSupplySpeeds[aToken];
         uint32 blockNumber = safe32(getBlockNumber(), "block number exceeds 32 bits");
         uint256 deltaBlocks = sub_(uint256(blockNumber), uint256(supplyState.block));
         if (deltaBlocks > 0 && supplySpeed > 0) {
             uint256 supplyTokens = AToken(aToken).totalSupply();
-            uint256 compAccrued = mul_(deltaBlocks, supplySpeed);
-            Double memory ratio = supplyTokens > 0 ? fraction(compAccrued, supplyTokens) : Double({mantissa: 0});
+            uint256 avatAccrued = mul_(deltaBlocks, supplySpeed);
+            Double memory ratio = supplyTokens > 0 ? fraction(avatAccrued, supplyTokens) : Double({mantissa: 0});
             supplyState.index = safe224(add_(Double({mantissa: supplyState.index}), ratio).mantissa, "new index exceeds 224 bits");
             supplyState.block = blockNumber;
         } else if (deltaBlocks > 0) {
@@ -1292,15 +1257,15 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param aToken The market whose borrow index to update
      * @dev Index is a cumulative sum of the COMP per aToken accrued.
      */
-    function updateCompBorrowIndex(address aToken, Exp memory marketBorrowIndex) internal {
-        CompMarketState storage borrowState = compBorrowState[aToken];
-        uint256 borrowSpeed = compBorrowSpeeds[aToken];
+    function updateAvatBorrowIndex(address aToken, Exp memory marketBorrowIndex) internal {
+        AvatMarketState storage borrowState = avatBorrowState[aToken];
+        uint256 borrowSpeed = avatBorrowSpeeds[aToken];
         uint32 blockNumber = safe32(getBlockNumber(), "block number exceeds 32 bits");
         uint256 deltaBlocks = sub_(uint256(blockNumber), uint256(borrowState.block));
         if (deltaBlocks > 0 && borrowSpeed > 0) {
             uint256 borrowAmount = div_(AToken(aToken).totalBorrows(), marketBorrowIndex);
-            uint256 compAccrued = mul_(deltaBlocks, borrowSpeed);
-            Double memory ratio = borrowAmount > 0 ? fraction(compAccrued, borrowAmount) : Double({mantissa: 0});
+            uint256 avatAccrued = mul_(deltaBlocks, borrowSpeed);
+            Double memory ratio = borrowAmount > 0 ? fraction(avatAccrued, borrowAmount) : Double({mantissa: 0});
             borrowState.index = safe224(add_(Double({mantissa: borrowState.index}), ratio).mantissa, "new index exceeds 224 bits");
             borrowState.block = blockNumber;
         } else if (deltaBlocks > 0) {
@@ -1313,23 +1278,23 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param aToken The market in which the supplier is interacting
      * @param supplier The address of the supplier to distribute COMP to
      */
-    function distributeSupplierComp(address aToken, address supplier) internal {
+    function distributeSupplierAvat(address aToken, address supplier) internal {
         // TODO: Don't distribute supplier COMP if the user is not in the supplier market.
-        // This check should be as gas efficient as possible as distributeSupplierComp is called in many places.
+        // This check should be as gas efficient as possible as distributeSupplierAvat is called in many places.
         // - We really don't want to call an external contract as that's quite expensive.
 
-        CompMarketState storage supplyState = compSupplyState[aToken];
+        AvatMarketState storage supplyState = avatSupplyState[aToken];
         uint256 supplyIndex = supplyState.index;
-        uint256 supplierIndex = compSupplierIndex[aToken][supplier];
+        uint256 supplierIndex = avatSupplierIndex[aToken][supplier];
 
         // Update supplier's index to the current index since we are distributing accrued COMP
-        compSupplierIndex[aToken][supplier] = supplyIndex;
+        avatSupplierIndex[aToken][supplier] = supplyIndex;
 
-        if (supplierIndex == 0 && supplyIndex >= compInitialIndex) {
+        if (supplierIndex == 0 && supplyIndex >= avatInitialIndex) {
             // Covers the case where users supplied tokens before the market's supply state index was set.
             // Rewards the user with COMP accrued from the start of when supplier rewards were first
             // set for the market.
-            supplierIndex = compInitialIndex;
+            supplierIndex = avatInitialIndex;
         }
 
         // Calculate change in the cumulative sum of the COMP per aToken accrued
@@ -1340,10 +1305,10 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         // Calculate COMP accrued: cTokenAmount * accruedPerCToken
         uint256 supplierDelta = mul_(supplierTokens, deltaIndex);
 
-        uint256 supplierAccrued = add_(compAccrued[supplier], supplierDelta);
-        compAccrued[supplier] = supplierAccrued;
+        uint256 supplierAccrued = add_(avatAccrued[supplier], supplierDelta);
+        avatAccrued[supplier] = supplierAccrued;
 
-        emit DistributedSupplierComp(AToken(aToken), supplier, supplierDelta, supplyIndex);
+        emit DistributedSupplierAvat(AToken(aToken), supplier, supplierDelta, supplyIndex);
     }
 
     /**
@@ -1352,27 +1317,27 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param aToken The market in which the borrower is interacting
      * @param borrower The address of the borrower to distribute COMP to
      */
-    function distributeBorrowerComp(
+    function distributeBorrowerAvat(
         address aToken,
         address borrower,
         Exp memory marketBorrowIndex
     ) internal {
         // TODO: Don't distribute supplier COMP if the user is not in the borrower market.
-        // This check should be as gas efficient as possible as distributeBorrowerComp is called in many places.
+        // This check should be as gas efficient as possible as distributeBorrowerAvat is called in many places.
         // - We really don't want to call an external contract as that's quite expensive.
 
-        CompMarketState storage borrowState = compBorrowState[aToken];
+        AvatMarketState storage borrowState = avatBorrowState[aToken];
         uint256 borrowIndex = borrowState.index;
-        uint256 borrowerIndex = compBorrowerIndex[aToken][borrower];
+        uint256 borrowerIndex = avatBorrowerIndex[aToken][borrower];
 
         // Update borrowers's index to the current index since we are distributing accrued COMP
-        compBorrowerIndex[aToken][borrower] = borrowIndex;
+        avatBorrowerIndex[aToken][borrower] = borrowIndex;
 
-        if (borrowerIndex == 0 && borrowIndex >= compInitialIndex) {
+        if (borrowerIndex == 0 && borrowIndex >= avatInitialIndex) {
             // Covers the case where users borrowed tokens before the market's borrow state index was set.
             // Rewards the user with COMP accrued from the start of when borrower rewards were first
             // set for the market.
-            borrowerIndex = compInitialIndex;
+            borrowerIndex = avatInitialIndex;
         }
 
         // Calculate change in the cumulative sum of the COMP per borrowed unit accrued
@@ -1383,10 +1348,10 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
         // Calculate COMP accrued: cTokenAmount * accruedPerBorrowedUnit
         uint256 borrowerDelta = mul_(borrowerAmount, deltaIndex);
 
-        uint256 borrowerAccrued = add_(compAccrued[borrower], borrowerDelta);
-        compAccrued[borrower] = borrowerAccrued;
+        uint256 borrowerAccrued = add_(avatAccrued[borrower], borrowerDelta);
+        avatAccrued[borrower] = borrowerAccrued;
 
-        emit DistributedBorrowerComp(AToken(aToken), borrower, borrowerDelta, borrowIndex);
+        emit DistributedBorrowerAvat(AToken(aToken), borrower, borrowerDelta, borrowIndex);
     }
 
     /**
@@ -1394,45 +1359,45 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param contributor The address to calculate contributor rewards for
      */
     function updateContributorRewards(address contributor) public {
-        uint256 compSpeed = compContributorSpeeds[contributor];
+        uint256 avatSpeed = avatContributorSpeeds[contributor];
         uint256 blockNumber = getBlockNumber();
         uint256 deltaBlocks = sub_(blockNumber, lastContributorBlock[contributor]);
-        if (deltaBlocks > 0 && compSpeed > 0) {
-            uint256 newAccrued = mul_(deltaBlocks, compSpeed);
-            uint256 contributorAccrued = add_(compAccrued[contributor], newAccrued);
+        if (deltaBlocks > 0 && avatSpeed > 0) {
+            uint256 newAccrued = mul_(deltaBlocks, avatSpeed);
+            uint256 contributorAccrued = add_(avatAccrued[contributor], newAccrued);
 
-            compAccrued[contributor] = contributorAccrued;
+            avatAccrued[contributor] = contributorAccrued;
             lastContributorBlock[contributor] = blockNumber;
         }
     }
 
     /**
-     * @notice Claim all the comp accrued by holder in all markets
+     * @notice Claim all the avat accrued by holder in all markets
      * @param holder The address to claim COMP for
      */
-    function claimComp(address holder) public {
-        return claimComp(holder, allMarkets);
+    function claimAvat(address holder) public {
+        return claimAvat(holder, allMarkets);
     }
 
     /**
-     * @notice Claim all the comp accrued by holder in the specified markets
+     * @notice Claim all the avat accrued by holder in the specified markets
      * @param holder The address to claim COMP for
      * @param cTokens The list of markets to claim COMP in
      */
-    function claimComp(address holder, AToken[] memory cTokens) public {
+    function claimAvat(address holder, AToken[] memory cTokens) public {
         address[] memory holders = new address[](1);
         holders[0] = holder;
-        claimComp(holders, cTokens, true, true);
+        claimAvat(holders, cTokens, true, true);
     }
 
     /**
-     * @notice Claim all comp accrued by the holders
+     * @notice Claim all avat accrued by the holders
      * @param holders The addresses to claim COMP for
      * @param cTokens The list of markets to claim COMP in
      * @param borrowers Whether or not to claim COMP earned by borrowing
      * @param suppliers Whether or not to claim COMP earned by supplying
      */
-    function claimComp(
+    function claimAvat(
         address[] memory holders,
         AToken[] memory cTokens,
         bool borrowers,
@@ -1443,20 +1408,20 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
             require(markets[address(aToken)].isListed, "market must be listed");
             if (borrowers == true) {
                 Exp memory borrowIndex = Exp({mantissa: aToken.borrowIndex()});
-                updateCompBorrowIndex(address(aToken), borrowIndex);
+                updateAvatBorrowIndex(address(aToken), borrowIndex);
                 for (uint256 j = 0; j < holders.length; j++) {
-                    distributeBorrowerComp(address(aToken), holders[j], borrowIndex);
+                    distributeBorrowerAvat(address(aToken), holders[j], borrowIndex);
                 }
             }
             if (suppliers == true) {
-                updateCompSupplyIndex(address(aToken));
+                updateAvatSupplyIndex(address(aToken));
                 for (uint256 j = 0; j < holders.length; j++) {
-                    distributeSupplierComp(address(aToken), holders[j]);
+                    distributeSupplierAvat(address(aToken), holders[j]);
                 }
             }
         }
         for (uint256 j = 0; j < holders.length; j++) {
-            compAccrued[holders[j]] = grantCompInternal(holders[j], compAccrued[holders[j]]);
+            avatAccrued[holders[j]] = grantAvatInternal(holders[j], avatAccrued[holders[j]]);
         }
     }
 
@@ -1467,17 +1432,17 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param amount The amount of COMP to (possibly) transfer
      * @return The amount of COMP which was NOT transferred to the user
      */
-    function grantCompInternal(address user, uint256 amount) internal returns (uint256) {
-        Comp comp = Comp(getCompAddress());
-        uint256 compRemaining = comp.balanceOf(address(this));
-        if (amount > 0 && amount <= compRemaining) {
-            comp.transfer(user, amount);
+    function grantAvatInternal(address user, uint256 amount) internal returns (uint256) {
+        EIP20Interface avat = EIP20Interface(avatAddress);
+        uint256 avatRemaining = avat.balanceOf(address(this));
+        if (amount > 0 && amount <= avatRemaining) {
+            avat.transfer(user, amount);
             return 0;
         }
         return amount;
     }
 
-    /*** Comp Distribution Admin ***/
+    /*** Avat Distribution Admin ***/
 
     /**
      * @notice Transfer COMP to the recipient
@@ -1485,11 +1450,11 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param recipient The address of the recipient to transfer COMP to
      * @param amount The amount of COMP to (possibly) transfer
      */
-    function _grantComp(address recipient, uint256 amount) public {
-        require(adminOrInitializing(), "only admin can grant comp");
-        uint256 amountLeft = grantCompInternal(recipient, amount);
-        require(amountLeft == 0, "insufficient comp for grant");
-        emit CompGranted(recipient, amount);
+    function _grantAvat(address recipient, uint256 amount) public {
+        require(adminOrInitializing(), "only admin can grant avat");
+        uint256 amountLeft = grantAvatInternal(recipient, amount);
+        require(amountLeft == 0, "insufficient avat for grant");
+        emit AvatGranted(recipient, amount);
     }
 
     /**
@@ -1498,40 +1463,56 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
      * @param supplySpeeds New supply-side COMP speed for the corresponding market.
      * @param borrowSpeeds New borrow-side COMP speed for the corresponding market.
      */
-    function _setCompSpeeds(
+    function _setAvatSpeeds(
         AToken[] memory cTokens,
         uint256[] memory supplySpeeds,
         uint256[] memory borrowSpeeds
     ) public {
-        require(adminOrInitializing(), "only admin can set comp speed");
+        require(adminOrInitializing(), "only admin can set avat speed");
 
         uint256 numTokens = cTokens.length;
-        require(numTokens == supplySpeeds.length && numTokens == borrowSpeeds.length, "Avatroller::_setCompSpeeds invalid input");
+        require(numTokens == supplySpeeds.length && numTokens == borrowSpeeds.length, "Avatroller::_setAvatSpeeds invalid input");
 
         for (uint256 i = 0; i < numTokens; ++i) {
-            setCompSpeedInternal(cTokens[i], supplySpeeds[i], borrowSpeeds[i]);
+            setAvatSpeedInternal(cTokens[i], supplySpeeds[i], borrowSpeeds[i]);
         }
+    }
+
+    /**
+     * @notice Set COMP borrow and supply speeds for the specified market.
+     * @param cToken The markets whose COMP speed to update.
+     * @param supplySpeed New supply-side COMP speed for the corresponding market.
+     * @param borrowSpeed New borrow-side COMP speed for the corresponding market.
+     */
+    function _setAvatSpeed(
+        AToken cToken,
+        uint256 supplySpeed,
+        uint256 borrowSpeed
+    ) public {
+        require(adminOrInitializing(), "only admin can set avat speed");
+
+        setAvatSpeedInternal(cToken, supplySpeed, borrowSpeed);
     }
 
     /**
      * @notice Set COMP speed for a single contributor
      * @param contributor The contributor whose COMP speed to update
-     * @param compSpeed New COMP speed for contributor
+     * @param avatSpeed New COMP speed for contributor
      */
-    function _setContributorCompSpeed(address contributor, uint256 compSpeed) public {
-        require(adminOrInitializing(), "only admin can set comp speed");
+    function _setContributorAvatSpeed(address contributor, uint256 avatSpeed) public {
+        require(adminOrInitializing(), "only admin can set avat speed");
 
         // note that COMP speed could be set to 0 to halt liquidity rewards for a contributor
         updateContributorRewards(contributor);
-        if (compSpeed == 0) {
+        if (avatSpeed == 0) {
             // release storage
             delete lastContributorBlock[contributor];
         } else {
             lastContributorBlock[contributor] = getBlockNumber();
         }
-        compContributorSpeeds[contributor] = compSpeed;
+        avatContributorSpeeds[contributor] = avatSpeed;
 
-        emit ContributorCompSpeedUpdated(contributor, compSpeed);
+        emit ContributorAvatSpeedUpdated(contributor, avatSpeed);
     }
 
     /**
@@ -1554,13 +1535,5 @@ contract Avatroller is AvatrollerV7Storage, AvatrollerInterface, AvatrollerError
 
     function getBlockNumber() public view virtual returns (uint256) {
         return block.number;
-    }
-
-    /**
-     * @notice Return the address of the COMP token
-     * @return The address of COMP
-     */
-    function getCompAddress() public view virtual returns (address) {
-        return 0xc00e94Cb662C3520282E6f5717214004A7f26888;
     }
 }

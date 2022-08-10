@@ -11,12 +11,11 @@ import "./library/ExponentialNoError.sol";
 /**
  * @title Compound's AToken Contract
  * @notice Abstract base for CTokens
- * @author Compound
  */
 abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorReporter {
     /**
      * @notice Initialize the money market
-     * @param comptroller_ The address of the Avatroller
+     * @param avatroller_ The address of the Avatroller
      * @param interestRateModel_ The address of the interest rate model
      * @param initialExchangeRateMantissa_ The initial exchange rate, scaled by 1e18
      * @param name_ EIP-20 name of this token
@@ -24,7 +23,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
      * @param decimals_ EIP-20 decimal precision of this token
      */
     function initialize(
-        AvatrollerInterface comptroller_,
+        AvatrollerInterface avatroller_,
         InterestRateModel interestRateModel_,
         uint256 initialExchangeRateMantissa_,
         string memory name_,
@@ -38,11 +37,11 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         initialExchangeRateMantissa = initialExchangeRateMantissa_;
         require(initialExchangeRateMantissa > 0, "initial exchange rate must be greater than zero.");
 
-        // Set the comptroller
-        uint256 err = _setAvatroller(comptroller_);
-        require(err == NO_ERROR, "setting comptroller failed");
+        // Set the avatroller
+        uint256 err = _setAvatroller(avatroller_);
+        require(err == NO_ERROR, "setting avatroller failed");
 
-        // Initialize block number and borrow index (block number mocks depend on comptroller being set)
+        // Initialize block number and borrow index (block number mocks depend on avatroller being set)
         accrualBlockNumber = getBlockNumber();
         borrowIndex = mantissaOne;
 
@@ -74,7 +73,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         uint256 tokens
     ) internal returns (uint256) {
         /* Fail if transfer not allowed */
-        uint256 allowed = comptroller.transferAllowed(address(this), src, dst, tokens);
+        uint256 allowed = avatroller.transferAllowed(address(this), src, dst, tokens);
         if (allowed != 0) {
             revert TransferAvatrollerRejection(allowed);
         }
@@ -113,7 +112,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         emit Transfer(src, dst, tokens);
 
         // unused function
-        // comptroller.transferVerify(address(this), src, dst, tokens);
+        // avatroller.transferVerify(address(this), src, dst, tokens);
 
         return NO_ERROR;
     }
@@ -190,7 +189,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
 
     /**
      * @notice Get a snapshot of the account's balances, and the cached exchange rate
-     * @dev This is used by comptroller to more efficiently perform liquidity checks.
+     * @dev This is used by avatroller to more efficiently perform liquidity checks.
      * @param account Address of the account to snapshot
      * @return (possible error, token balance, borrow balance, exchange rate mantissa)
      */
@@ -413,7 +412,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
      */
     function mintFresh(address minter, uint256 mintAmount) internal {
         /* Fail if mint not allowed */
-        uint256 allowed = comptroller.mintAllowed(address(this), minter, mintAmount);
+        uint256 allowed = avatroller.mintAllowed(address(this), minter, mintAmount);
         if (allowed != 0) {
             revert MintAvatrollerRejection(allowed);
         }
@@ -461,7 +460,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
 
         /* We call the defense hook */
         // unused function
-        // comptroller.mintVerify(address(this), minter, actualMintAmount, mintTokens);
+        // avatroller.mintVerify(address(this), minter, actualMintAmount, mintTokens);
     }
 
     /**
@@ -525,7 +524,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         }
 
         /* Fail if redeem not allowed */
-        uint256 allowed = comptroller.redeemAllowed(address(this), redeemer, redeemTokens);
+        uint256 allowed = avatroller.redeemAllowed(address(this), redeemer, redeemTokens);
         if (allowed != 0) {
             revert RedeemAvatrollerRejection(allowed);
         }
@@ -564,7 +563,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         emit Redeem(redeemer, redeemAmount, redeemTokens);
 
         /* We call the defense hook */
-        comptroller.redeemVerify(address(this), redeemer, redeemAmount, redeemTokens);
+        avatroller.redeemVerify(address(this), redeemer, redeemAmount, redeemTokens);
     }
 
     /**
@@ -583,7 +582,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
      */
     function borrowFresh(address payable borrower, uint256 borrowAmount) internal {
         /* Fail if borrow not allowed */
-        uint256 allowed = comptroller.borrowAllowed(address(this), borrower, borrowAmount);
+        uint256 allowed = avatroller.borrowAllowed(address(this), borrower, borrowAmount);
         if (allowed != 0) {
             revert BorrowAvatrollerRejection(allowed);
         }
@@ -665,7 +664,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         uint256 repayAmount
     ) internal returns (uint256) {
         /* Fail if repayBorrow not allowed */
-        uint256 allowed = comptroller.repayBorrowAllowed(address(this), payer, borrower, repayAmount);
+        uint256 allowed = avatroller.repayBorrowAllowed(address(this), payer, borrower, repayAmount);
         if (allowed != 0) {
             revert RepayBorrowAvatrollerRejection(allowed);
         }
@@ -752,7 +751,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         ATokenInterface cTokenCollateral
     ) internal {
         /* Fail if liquidate not allowed */
-        uint256 allowed = comptroller.liquidateBorrowAllowed(address(this), address(cTokenCollateral), liquidator, borrower, repayAmount);
+        uint256 allowed = avatroller.liquidateBorrowAllowed(address(this), address(cTokenCollateral), liquidator, borrower, repayAmount);
         if (allowed != 0) {
             revert LiquidateAvatrollerRejection(allowed);
         }
@@ -790,7 +789,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         // (No safe failures beyond this point)
 
         /* We calculate the number of collateral tokens that will be seized */
-        (uint256 amountSeizeError, uint256 seizeTokens) = comptroller.liquidateCalculateSeizeTokens(address(this), address(cTokenCollateral), actualRepayAmount);
+        (uint256 amountSeizeError, uint256 seizeTokens) = avatroller.liquidateCalculateSeizeTokens(address(this), address(cTokenCollateral), actualRepayAmount);
         require(amountSeizeError == NO_ERROR, "LIQUIDATE_COMPTROLLER_CALCULATE_AMOUNT_SEIZE_FAILED");
 
         /* Revert if borrower collateral token balance < seizeTokens */
@@ -842,7 +841,7 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
         uint256 seizeTokens
     ) internal {
         /* Fail if seize not allowed */
-        uint256 allowed = comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens);
+        uint256 allowed = avatroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens);
         if (allowed != 0) {
             revert LiquidateSeizeAvatrollerRejection(allowed);
         }
@@ -933,8 +932,8 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
     }
 
     /**
-     * @notice Sets a new comptroller for the market
-     * @dev Admin function to set a new comptroller
+     * @notice Sets a new avatroller for the market
+     * @dev Admin function to set a new avatroller
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _setAvatroller(AvatrollerInterface newAvatroller) public override returns (uint256) {
@@ -943,12 +942,12 @@ abstract contract AToken is ATokenInterface, ExponentialNoError, TokenErrorRepor
             revert SetAvatrollerOwnerCheck();
         }
 
-        AvatrollerInterface oldAvatroller = comptroller;
-        // Ensure invoke comptroller.isAvatroller() returns true
+        AvatrollerInterface oldAvatroller = avatroller;
+        // Ensure invoke avatroller.isAvatroller() returns true
         require(newAvatroller.isAvatroller(), "marker method returned false");
 
-        // Set market's comptroller to newAvatroller
-        comptroller = newAvatroller;
+        // Set market's avatroller to newAvatroller
+        avatroller = newAvatroller;
 
         // Emit NewAvatroller(oldAvatroller, newAvatroller)
         emit NewAvatroller(oldAvatroller, newAvatroller);

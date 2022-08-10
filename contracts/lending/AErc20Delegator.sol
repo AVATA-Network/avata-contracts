@@ -6,13 +6,12 @@ import "./interfaces/ATokenInterfaces.sol";
 /**
  * @title Compound's AErc20Delegator Contract
  * @notice CTokens which wrap an EIP-20 underlying and delegate to an implementation
- * @author Compound
  */
 contract AErc20Delegator is ATokenInterface, AErc20Interface, ADelegatorInterface {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
-     * @param comptroller_ The address of the Avatroller
+     * @param avatroller_ The address of the Avatroller
      * @param interestRateModel_ The address of the interest rate model
      * @param initialExchangeRateMantissa_ The initial exchange rate, scaled by 1e18
      * @param name_ ERC-20 name of this token
@@ -24,7 +23,7 @@ contract AErc20Delegator is ATokenInterface, AErc20Interface, ADelegatorInterfac
      */
     constructor(
         address underlying_,
-        AvatrollerInterface comptroller_,
+        AvatrollerInterface avatroller_,
         InterestRateModel interestRateModel_,
         uint256 initialExchangeRateMantissa_,
         string memory name_,
@@ -38,7 +37,7 @@ contract AErc20Delegator is ATokenInterface, AErc20Interface, ADelegatorInterfac
         admin = payable(msg.sender);
 
         // First delegate gets to initialize the delegator (i.e. storage contract)
-        delegateTo(implementation_, abi.encodeWithSignature("initialize(address,address,address,uint256,string,string,uint8)", underlying_, comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_));
+        delegateTo(implementation_, abi.encodeWithSignature("initialize(address,address,address,uint256,string,string,uint8)", underlying_, avatroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_));
 
         // New implementations always get set via the settor (post-initialize)
         _setImplementation(implementation_, false, becomeImplementationData);
@@ -227,7 +226,7 @@ contract AErc20Delegator is ATokenInterface, AErc20Interface, ADelegatorInterfac
 
     /**
      * @notice Get a snapshot of the account's balances, and the cached exchange rate
-     * @dev This is used by comptroller to more efficiently perform liquidity checks.
+     * @dev This is used by avatroller to more efficiently perform liquidity checks.
      * @param account Address of the account to snapshot
      * @return (possible error, token balance, borrow balance, exchange rate mantissa)
      */
@@ -371,8 +370,8 @@ contract AErc20Delegator is ATokenInterface, AErc20Interface, ADelegatorInterfac
     }
 
     /**
-     * @notice Sets a new comptroller for the market
-     * @dev Admin function to set a new comptroller
+     * @notice Sets a new avatroller for the market
+     * @dev Admin function to set a new avatroller
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _setAvatroller(AvatrollerInterface newAvatroller) public override returns (uint256) {

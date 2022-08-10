@@ -6,13 +6,12 @@ import "./AErc20.sol";
 /**
  * @title Compound's AErc20Immutable Contract
  * @notice CTokens which wrap an EIP-20 underlying and are immutable
- * @author Compound
  */
 contract AErc20Immutable is AErc20 {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
-     * @param comptroller_ The address of the Avatroller
+     * @param avatroller_ The address of the Avatroller
      * @param interestRateModel_ The address of the interest rate model
      * @param initialExchangeRateMantissa_ The initial exchange rate, scaled by 1e18
      * @param name_ ERC-20 name of this token
@@ -22,7 +21,7 @@ contract AErc20Immutable is AErc20 {
      */
     constructor(
         address underlying_,
-        AvatrollerInterface comptroller_,
+        AvatrollerInterface avatroller_,
         InterestRateModel interestRateModel_,
         uint256 initialExchangeRateMantissa_,
         string memory name_,
@@ -34,7 +33,7 @@ contract AErc20Immutable is AErc20 {
         admin = payable(msg.sender);
 
         // Initialize the market
-        initialize(underlying_, comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
+        initialize(underlying_, avatroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
 
         // Set the proper admin now that initialization is done
         admin = admin_;

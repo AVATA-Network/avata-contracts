@@ -6,14 +6,13 @@ import "./AToken.sol";
 /**
  * @title Compound's AAVAX Contract
  * @notice AToken which wraps Ether
- * @author Compound
  */
 contract AAVAX is AToken {
     address public underlying;
 
     /**
      * @notice Construct a new AAVAX money market
-     * @param comptroller_ The address of the Avatroller
+     * @param avatroller_ The address of the Avatroller
      * @param interestRateModel_ The address of the interest rate model
      * @param initialExchangeRateMantissa_ The initial exchange rate, scaled by 1e18
      * @param name_ ERC-20 name of this token
@@ -22,7 +21,7 @@ contract AAVAX is AToken {
      * @param admin_ Address of the administrator of this token
      */
     constructor(
-        AvatrollerInterface comptroller_,
+        AvatrollerInterface avatroller_,
         InterestRateModel interestRateModel_,
         uint256 initialExchangeRateMantissa_,
         string memory name_,
@@ -33,7 +32,7 @@ contract AAVAX is AToken {
         // Creator of the contract is admin during initialization
         admin = payable(msg.sender);
 
-        initialize(comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
+        initialize(avatroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
 
         // for PriceOracleProxyUSD
         underlying = address(0x0);

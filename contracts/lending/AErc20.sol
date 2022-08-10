@@ -3,20 +3,19 @@ pragma solidity ^0.8.10;
 
 import "./AToken.sol";
 
-interface CompLike {
+interface AvatLike {
     function delegate(address delegatee) external;
 }
 
 /**
  * @title Compound's AErc20 Contract
  * @notice CTokens which wrap an EIP-20 underlying
- * @author Compound
  */
 contract AErc20 is AToken, AErc20Interface {
     /**
      * @notice Initialize the new money market
      * @param underlying_ The address of the underlying asset
-     * @param comptroller_ The address of the Avatroller
+     * @param avatroller_ The address of the Avatroller
      * @param interestRateModel_ The address of the interest rate model
      * @param initialExchangeRateMantissa_ The initial exchange rate, scaled by 1e18
      * @param name_ ERC-20 name of this token
@@ -25,7 +24,7 @@ contract AErc20 is AToken, AErc20Interface {
      */
     function initialize(
         address underlying_,
-        AvatrollerInterface comptroller_,
+        AvatrollerInterface avatroller_,
         InterestRateModel interestRateModel_,
         uint256 initialExchangeRateMantissa_,
         string memory name_,
@@ -33,7 +32,7 @@ contract AErc20 is AToken, AErc20Interface {
         uint8 decimals_
     ) public {
         // AToken initialize does the bulk of the work
-        super.initialize(comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
+        super.initialize(avatroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
 
         // Set underlying and sanity check it
         underlying = underlying_;
@@ -230,11 +229,11 @@ contract AErc20 is AToken, AErc20Interface {
 
     /**
      * @notice Admin call to delegate the votes of the COMP-like underlying
-     * @param compLikeDelegatee The address to delegate votes to
+     * @param avatLikeDelegatee The address to delegate votes to
      * @dev CTokens whose underlying are not CompLike should revert here
      */
-    function _delegateCompLikeTo(address compLikeDelegatee) external {
-        require(msg.sender == admin, "only the admin may set the comp-like delegate");
-        CompLike(underlying).delegate(compLikeDelegatee);
+    function _delegateAvatLikeTo(address avatLikeDelegatee) external {
+        require(msg.sender == admin, "only the admin may set the avat-like delegate");
+        AvatLike(underlying).delegate(avatLikeDelegatee);
     }
 }

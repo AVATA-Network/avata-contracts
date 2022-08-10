@@ -46,7 +46,7 @@ contract ATokenStorage {
     /**
      * @notice Contract which oversees inter-aToken operations
      */
-    AvatrollerInterface public comptroller;
+    AvatrollerInterface public avatroller;
 
     /**
      * @notice Model which tells what the current interest rate should be
@@ -162,7 +162,7 @@ abstract contract ATokenInterface is ATokenStorage {
     event NewAdmin(address oldAdmin, address newAdmin);
 
     /**
-     * @notice Event emitted when comptroller is changed
+     * @notice Event emitted when avatroller is changed
      */
     event NewAvatroller(AvatrollerInterface oldAvatroller, AvatrollerInterface newAvatroller);
 

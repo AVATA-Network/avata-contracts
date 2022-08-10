@@ -5,7 +5,6 @@ import "./InterestRateModel.sol";
 
 /**
  * @title Compound's JumpRateModel Contract
- * @author Compound
  */
 contract JumpRateModel is InterestRateModel {
     event NewInterestParams(uint256 baseRatePerBlock, uint256 multiplierPerBlock, uint256 jumpMultiplierPerBlock, uint256 kink);

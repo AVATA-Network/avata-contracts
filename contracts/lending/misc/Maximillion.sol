@@ -5,7 +5,6 @@ import "../AAVAX.sol";
 
 /**
  * @title Compound's Maximillion Contract
- * @author Compound
  */
 contract Maximillion {
     /**

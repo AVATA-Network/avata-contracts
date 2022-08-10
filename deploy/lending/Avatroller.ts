@@ -1,5 +1,8 @@
 import { parseEther } from "ethers/lib/utils"
 import { HardhatRuntimeEnvironment } from "hardhat/types"
+import { SimplePriceOracle } from "../../build/typechain"
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 module.exports = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre
@@ -33,13 +36,20 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
         const CLOSE_FACTOR = parseEther("0.5")
         const LIQUIDATION_INCENTIVE = parseEther("1.08")
 
+        // const avatTokenAddress = (await deployments.get("AvatToken")).address
+        const avatTokenAddress = "0xFEA3384414b78F1A8678DE81Dc93DFA2d2168E3e"
+
+        await execute("Avatroller", { from: deployer, log: true }, "_setAvatAddress", avatTokenAddress)
+        await sleep(3000) // note: nonce has already been used
         await execute("Avatroller", { from: deployer, log: true }, "_setCloseFactor", CLOSE_FACTOR)
+        await sleep(3000)
         await execute("Avatroller", { from: deployer, log: true }, "_setLiquidationIncentive", LIQUIDATION_INCENTIVE)
+        await sleep(3000)
         await execute("Avatroller", { from: deployer, log: true }, "_setPriceOracle", priceOracleAddress)
-        // await execute('Comptroller', { from: deployer }, '_setPauseGuardian', guardian);
-        // await execute('Comptroller', { from: deployer }, '_setBorrowCapGuardian', guardian);
+        // await execute('Avatroller', { from: deployer }, '_setPauseGuardian', guardian);
+        // await execute('Avatroller', { from: deployer }, '_setBorrowCapGuardian', guardian);
     }
 }
 
 module.exports.tags = ["Avatroller"]
-module.exports.dependencies = ["Unitroller"]
+module.exports.dependencies = ["Unitroller", "AvatToken"]

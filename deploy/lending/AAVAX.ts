@@ -22,7 +22,17 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
         return
     }
 
-    const { name, interestRateModel, decimals, priceFeedAddress, collateralFactor, reserveFactor, initialExchangeRateMantissa } = aTokenConfig
+    const {
+        name,
+        interestRateModel,
+        decimals,
+        priceFeedAddress,
+        avatBorrowSpeed,
+        avatSupplySpeed,
+        collateralFactor,
+        reserveFactor,
+        initialExchangeRateMantissa,
+    } = aTokenConfig
 
     if (name !== "AVAX") {
         console.log(`wrong script to deploy AVAX, skip...`)
@@ -45,6 +55,17 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
     await execute("Avatroller", { from: deployer, log: true }, "_setCollateralFactor", aAVAXContract.address, parseEther(collateralFactor))
 
     await execute("AAVAX", { from: deployer, log: true }, "_setReserveFactor", parseEther(reserveFactor))
+
+    if (+avatBorrowSpeed > 0 || +avatSupplySpeed > 0) {
+        await execute(
+            "Avatroller",
+            { from: deployer, log: true },
+            "_setAvatSpeed",
+            aAVAXContract.address,
+            parseUnits(avatSupplySpeed, "6"),
+            parseUnits(avatBorrowSpeed, "6")
+        )
+    }
 }
 
 module.exports.tags = ["AAVAX"]
@@ -73,6 +94,20 @@ _config.set("43113", {
     priceFeedAddress: "0x5498BB86BC934c8D34FDA08E81D444153d0D06aD",
     collateralFactor: "0.75",
     reserveFactor: "0.20",
+    avatBorrowSpeed: "0.1",
+    avatSupplySpeed: "0.1",
+})
+
+_config.set("43114", {
+    name: "AVAX",
+    interestRateModel: InterestRateModelEnum.MAJOR,
+    decimals: 8,
+    initialExchangeRateMantissa: parseUnits("2", 26).toString(),
+    priceFeedAddress: "0x0A77230d17318075983913bC2145DB16C7366156",
+    collateralFactor: "0.75",
+    reserveFactor: "0.20",
+    avatBorrowSpeed: "0.1",
+    avatSupplySpeed: "0.1",
 })
 
 interface ATokenConfig {
@@ -83,4 +118,6 @@ interface ATokenConfig {
     priceFeedAddress: string
     collateralFactor: string
     reserveFactor: string
+    avatBorrowSpeed: string
+    avatSupplySpeed: string
 }

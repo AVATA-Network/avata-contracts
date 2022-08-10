@@ -2,12 +2,12 @@
 pragma solidity ^0.8.10;
 
 import "./library/ErrorReporter.sol";
-import "./AvatrollerStorage.sol";
+import "./UnitrollerAdminStorage.sol";
 
 /**
  * @title AvatrollerCore
- * @dev Storage for the comptroller is at this address, while execution is delegated to the `comptrollerImplementation`.
- * CTokens should reference this contract as their comptroller.
+ * @dev Storage for the avatroller is at this address, while execution is delegated to the `avatrollerImplementation`.
+ * CTokens should reference this contract as their avatroller.
  */
 contract Unitroller is UnitrollerAdminStorage, AvatrollerErrorReporter {
     /**
@@ -16,7 +16,7 @@ contract Unitroller is UnitrollerAdminStorage, AvatrollerErrorReporter {
     event NewPendingImplementation(address oldPendingImplementation, address newPendingImplementation);
 
     /**
-     * @notice Emitted when pendingAvatrollerImplementation is accepted, which means comptroller implementation is updated
+     * @notice Emitted when pendingAvatrollerImplementation is accepted, which means avatroller implementation is updated
      */
     event NewImplementation(address oldImplementation, address newImplementation);
 
@@ -30,7 +30,7 @@ contract Unitroller is UnitrollerAdminStorage, AvatrollerErrorReporter {
      */
     event NewAdmin(address oldAdmin, address newAdmin);
 
-    constructor() public {
+    constructor() {
         // Set admin to caller
         admin = msg.sender;
     }
@@ -51,7 +51,7 @@ contract Unitroller is UnitrollerAdminStorage, AvatrollerErrorReporter {
     }
 
     /**
-     * @notice Accepts new implementation of comptroller. msg.sender must be pendingImplementation
+     * @notice Accepts new implementation of avatroller. msg.sender must be pendingImplementation
      * @dev Admin function for new implementation to accept it's role as implementation
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
@@ -62,14 +62,14 @@ contract Unitroller is UnitrollerAdminStorage, AvatrollerErrorReporter {
         }
 
         // Save current values for inclusion in log
-        address oldImplementation = comptrollerImplementation;
+        address oldImplementation = avatrollerImplementation;
         address oldPendingImplementation = pendingAvatrollerImplementation;
 
-        comptrollerImplementation = pendingAvatrollerImplementation;
+        avatrollerImplementation = pendingAvatrollerImplementation;
 
         pendingAvatrollerImplementation = address(0);
 
-        emit NewImplementation(oldImplementation, comptrollerImplementation);
+        emit NewImplementation(oldImplementation, avatrollerImplementation);
         emit NewPendingImplementation(oldPendingImplementation, pendingAvatrollerImplementation);
 
         return uint256(Error.NO_ERROR);
@@ -133,7 +133,7 @@ contract Unitroller is UnitrollerAdminStorage, AvatrollerErrorReporter {
      */
     fallback() external payable {
         // delegate all other functions to current implementation
-        (bool success, ) = comptrollerImplementation.delegatecall(msg.data);
+        (bool success, ) = avatrollerImplementation.delegatecall(msg.data);
 
         assembly {
             let free_mem_ptr := mload(0x40)

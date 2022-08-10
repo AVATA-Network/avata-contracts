@@ -7,7 +7,6 @@ import "../interfaces/EIP20Interface.sol";
  * @title Reservoir Contract
  * @notice Distributes a token to a different contract at a fixed rate.
  * @dev This contract must be poked via the `drip()` function every so often.
- * @author Compound
  */
 contract Reservoir {
     /// @notice The block number when the Reservoir started (immutable)
