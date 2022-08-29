@@ -34,10 +34,9 @@ module.exports = async function (hre: HardhatRuntimeEnvironment) {
         const priceOracleAddress = (await deployments.get("PriceOracleProxyUSD")).address
 
         const CLOSE_FACTOR = parseEther("0.5")
-        const LIQUIDATION_INCENTIVE = parseEther("1.08")
+        const LIQUIDATION_INCENTIVE = parseEther("1.05")
 
-        // const avatTokenAddress = (await deployments.get("AvatToken")).address
-        const avatTokenAddress = "0xFEA3384414b78F1A8678DE81Dc93DFA2d2168E3e"
+        const avatTokenAddress = (await deployments.get("AvatToken")).address
 
         await execute("Avatroller", { from: deployer, log: true }, "_setAvatAddress", avatTokenAddress)
         await sleep(3000) // note: nonce has already been used

@@ -98,16 +98,17 @@ _config.set("43113", {
     avatSupplySpeed: "0.1",
 })
 
+// avalanche mainnet
 _config.set("43114", {
     name: "AVAX",
     interestRateModel: InterestRateModelEnum.MAJOR,
     decimals: 8,
     initialExchangeRateMantissa: parseUnits("2", 26).toString(),
     priceFeedAddress: "0x0A77230d17318075983913bC2145DB16C7366156",
-    collateralFactor: "0.75",
-    reserveFactor: "0.20",
-    avatBorrowSpeed: "0.1",
-    avatSupplySpeed: "0.1",
+    collateralFactor: "0.65",
+    reserveFactor: "0.10",
+    avatBorrowSpeed: "0.0025",
+    avatSupplySpeed: "0.0025",
 })
 
 interface ATokenConfig {
